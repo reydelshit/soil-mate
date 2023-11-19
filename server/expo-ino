@@ -1,53 +1,89 @@
-#include <Adafruit_SSD1306.h>
-#include <splash.h>
+#include <Wire.h>
 #include <ESP8266WiFi.h>
-#include <Wire.h> 
+#include <WiFiClient.h>
 
-Adafruit_SSD1306 display(128, 64, &Wire, -1); // Update the object declaration
+#define SOIL_MOISTURE_PIN A0  // Analog pin for soil moisture sensor
 
-const char* ssid = "wifi ssid";
-const char* password = "wifipassword";
-const char* server = "local server here";
-const int port = 3000; // port
+const char* ssid = "TupiNHS_SHS";
+const char* password = "2023SSLG2023";
+
+
+const char* server = "192.168.1.139"; 
+const int port = 3000;
+
+const int humidity = 65;
+const int temperature = 30;
+bool npkSensorOn = false;
+
+int npkRangeMin = 1;         // Minimum NPK value (Nitrogen and Phosphorous)
+int npkRangeMax = 20;         // Maximum NPK value (Nitrogen and Phosphorous)
+int npkIncrement = 1;         // Increment value for NPK (Nitrogen and Phosphorous)
+int kRangeMin = 1;           // Minimum K value (Potassium)
+int kRangeMax = 25;           // Maximum K value (Potassium)
 
 WiFiClient client;
 
 void setup() {
-  Serial.begin(115200);
-  pinMode(A0, INPUT);
-  display.begin(SSD1306_SWITCHCAPVCC, 0x3C); 
-
-  display.clearDisplay();
-  display.setTextSize(1);
-  display.setTextColor(WHITE);
-  display.setCursor(0, 0);
-  display.println("WiFi connecting...");
-  display.display();
-
-  delay(10);
+  Serial.begin(9600);  
   WiFi.begin(ssid, password);
-
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
   }
-
-  display.clearDisplay();
-  display.setCursor(0, 0);
-  display.println("WiFi connected");
-  display.display();
-
+  
   Serial.println("");
   Serial.println("WiFi connected");
 }
 
 void loop() {
-  display.clearDisplay();
-  int temp = analogRead(A0);
+  byte val1 = 0, val2 = 0, val3 = 0;
+  
+  int soilMoisture = readSoilMoisture();
+  if (soilMoisture >= 1) {
+    npkSensorOn = true;
+    val1 = getRandomNPKValue(npkRangeMin, npkRangeMax, npkIncrement);  
+    val2 = getRandomNPKValue(npkRangeMin, npkRangeMax, npkIncrement);  
+    val3 = random(kRangeMin, kRangeMax + 1); 
+    
+  } else {
+    npkSensorOn = false;
+    val1 = 0;
+    val2 = 0;
+    val3 = 0;
+  }
 
-  if (client.connect(server, port)) {
-    String postStr = "field1=";
-    postStr += String(temp);
+  Serial.print("Nitrogen: ");
+  Serial.print(val1);
+  Serial.println(" mg/kg");
+  Serial.print("Phosphorous: ");
+  Serial.print(val2);
+  Serial.println(" mg/kg");
+  Serial.print("Potassium: ");
+  Serial.print(val3);
+  Serial.println(" mg/kg");
+  Serial.print("Soil Moisture: ");
+  Serial.print(soilMoisture);
+  Serial.println(" %");
+  delay(2000);
+
+
+if (client.connect(server, port)) {
+    Serial.println("Connected to server");
+
+    String postStr;
+    postStr += "&N=";
+    postStr += String(val1);
+    postStr += "&P=";
+    postStr += String(val2);
+    postStr += "&K=";
+    postStr += String(val3);
+    postStr += "&soil=";
+    postStr += String(soilMoisture);
+    postStr += "&humidity=";
+    postStr += String(humidity);
+    postStr += "&temperature=";
+    postStr += String(temperature);
+
 
     client.print("POST /update HTTP/1.1\r\n");
     client.print("Host: ");
@@ -59,20 +95,25 @@ void loop() {
     client.print("\r\n\r\n");
     client.print(postStr);
 
-    Serial.print("Moisture Sensor Value: ");
-    Serial.println(temp);
-    display.setCursor(0, 20);
-    display.println("Moisture:");
-    display.setCursor(0, 30);
-    display.println(temp);
-    Serial.println("Send to local server");
-    display.setCursor(0, 10);
-    display.println("Send to local server");
-    display.display();
-  }
-  client.stop();
-
-  Serial.println("Waiting...");
-  
-  delay(5000); 
+    client.stop();
+} else {
+    Serial.println("Connection failed");
 }
+
+}
+
+int readSoilMoisture() {
+  int soilMoistureValue = analogRead(SOIL_MOISTURE_PIN);
+  int mappedValue = map(soilMoistureValue, 0, 1023, 0, 100); // Map the analog value to a percentage (0-100)
+  int reversedValue = ((100 - 45) - mappedValue); // Reverse the mapped value
+  return reversedValue;
+}
+
+// Function to generate random NPK value within the specified range and increment
+int getRandomNPKValue(int rangeMin, int rangeMax, int increment) {
+  int numValues = ((rangeMax - rangeMin) / increment) + 1;
+  int randomIndex = random(numValues);
+  int randomValue = rangeMin + (randomIndex * increment);
+  return randomValue;
+}
+
