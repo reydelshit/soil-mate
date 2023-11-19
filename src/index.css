@@ -1,0 +1,20 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+
+
+body {
+  margin: 0;
+  display: flex;
+  place-items: center;
+  width: 100vw;
+  min-height: 100vh;
+  background-color:  #41644a;
+
+  border: 1px solid #e2e8f0;
+
+  overflow-x: hidden;
+
+}
+

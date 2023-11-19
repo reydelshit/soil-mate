@@ -1,0 +1,78 @@
+#include <Adafruit_SSD1306.h>
+#include <splash.h>
+#include <ESP8266WiFi.h>
+#include <Wire.h> 
+
+Adafruit_SSD1306 display(128, 64, &Wire, -1); // Update the object declaration
+
+const char* ssid = "wifi ssid";
+const char* password = "wifipassword";
+const char* server = "local server here";
+const int port = 3000; // port
+
+WiFiClient client;
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(A0, INPUT);
+  display.begin(SSD1306_SWITCHCAPVCC, 0x3C); 
+
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(WHITE);
+  display.setCursor(0, 0);
+  display.println("WiFi connecting...");
+  display.display();
+
+  delay(10);
+  WiFi.begin(ssid, password);
+
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+
+  display.clearDisplay();
+  display.setCursor(0, 0);
+  display.println("WiFi connected");
+  display.display();
+
+  Serial.println("");
+  Serial.println("WiFi connected");
+}
+
+void loop() {
+  display.clearDisplay();
+  int temp = analogRead(A0);
+
+  if (client.connect(server, port)) {
+    String postStr = "field1=";
+    postStr += String(temp);
+
+    client.print("POST /update HTTP/1.1\r\n");
+    client.print("Host: ");
+    client.print(server);
+    client.print("\r\n");
+    client.print("Content-Type: application/x-www-form-urlencoded\r\n");
+    client.print("Content-Length: ");
+    client.print(postStr.length());
+    client.print("\r\n\r\n");
+    client.print(postStr);
+
+    Serial.print("Moisture Sensor Value: ");
+    Serial.println(temp);
+    display.setCursor(0, 20);
+    display.println("Moisture:");
+    display.setCursor(0, 30);
+    display.println(temp);
+    Serial.println("Send to local server");
+    display.setCursor(0, 10);
+    display.println("Send to local server");
+    display.display();
+  }
+  client.stop();
+
+  Serial.println("Waiting...");
+  
+  delay(5000); 
+}
